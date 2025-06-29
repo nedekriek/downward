@@ -58,7 +58,7 @@ This version of FastDownwards contains a SAT-based planner.
 To use it, FastDownward needs to be build while linking against a SAT solver.
 **Note: this version of FastDownward cannot be build without SAT solver support. This will be changed in the future.**
 
-Currently, we recommend to build against the SAT solver [kissat](https://github.com/arminbiere/kissat) -- it is one of the best performing SAT solvers currently available.
+Currently, we recommend to build against the SAT solver [kissat](https://github.com/arminbiere/kissat) - it is one of the best performing SAT solvers currently available.
 In principle, FastDownward can be build against any SAT solver that generates an IPASIR interface.
 This *should* currently work, but has not been tested.
 
@@ -85,7 +85,7 @@ For kissat, you need to add the argument
 ```
 --kissat
 ```
-That is, you overall add two arguments ``-s/PATH/TO/kissat/build/ --kissat``` to the build call.
+That is, you overall add two arguments ``-s/PATH/TO/kissat/build/ --kissat`` to the build call.
 
 
 ### Optional: Plan Validator
