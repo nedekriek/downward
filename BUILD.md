@@ -52,6 +52,42 @@ rm -rf soplex-release-710 build
 After installation, permanently set the environment variable `soplex_DIR` to the value you used during the installation.
 
 
+### Optional: SAT Solver
+
+This version of FastDownwards contains a SAT-based planner.
+To use it, FastDownward needs to be build while linking against a SAT solver.
+**Note: this version of FastDownward cannot be build without SAT solver support. This will be changed in the future.**
+
+Currently, we recommend to build against the SAT solver [kissat](https://github.com/arminbiere/kissat) -- it is one of the best performing SAT solvers currently available.
+In principle, FastDownward can be build against any SAT solver that generates an IPASIR interface.
+This *should* currently work, but has not been tested.
+
+
+For [kissat](https://github.com/arminbiere/kissat), download its source code.
+You then need to compile kissat *with shared library support*
+```bash
+git clone git@github.com:arminbiere/kissat.git
+cd kissat
+./configure -shared
+make -j
+```
+
+To build FastDownward with support for SAT solvers, you need to add arguments when calling the build script (see how to call the build script below).
+In any case, you need to provide the path to the sat solver library (that is the directory in which the ``*.so`` file is located) with
+```
+-s/PATH/TO/SAT/DIR
+```
+**Note:** There is no space after ``-s``.
+For kissat, this is the ``/PATH/TO/kissat/build`` directory.
+
+Additionally, you need to inform the build script which SAT solver you provided (it is not able to determine this itself!).
+For kissat, you need to add the argument
+```
+--kissat
+```
+That is, you overall add two arguments ``-s/PATH/TO/kissat/build/ --kissat``` to the build call.
+
+
 ### Optional: Plan Validator
 
 You can validate the found plans by passing `--validate` (implied by `--debug`) to the planner if the [VAL plan validation software](https://github.com/KCL-Planning/VAL)
