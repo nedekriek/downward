@@ -61,13 +61,10 @@ public:
 
 	bool forceAtLeastOneAction;
 
-	std::vector<bool> is_leaf_operator;
-
 	// index: timestep -> variable -> value
 	std::vector<std::vector<std::vector<int>>> fact_variables;
 	// index: timestep -> operator 
 	std::vector<std::vector<int>> operator_variables;
-	std::vector<std::vector<int>> real_operator_variables;
 	int get_fact_var(int time, FactProxy fact);
 
 	std::unordered_set<int> statically_true_derived_predicates;
@@ -132,6 +129,7 @@ public:
 	std::map<std::string,int> clauseCounter;
 	std::map<std::string,int> variableCounter;
 	
+	void set_up_axioms();
 	void set_up_exists_step();
 	void set_up_single_step();
 

@@ -113,10 +113,51 @@ void SATSearch::initialize() {
 		<< " for plan length: " << (planLength==-1?"all":to_string(planLength))
         << endl;
 
-	// detect leaf operators
-	is_leaf_operator.resize(task_proxy.get_operators().size());
-	size_t number_of_non_leaf_operators = task_proxy.get_operators().size();
+	// set up data structures for derived predicates and axioms -- won't do anything if none of them exist.
+	set_up_axioms();
 
+	// prepare for parallelism encodings 
+	if (existsStep)
+		set_up_exists_step();
+	else
+		set_up_single_step();
+
+	assert(global_action_ordering.size() == task_proxy.get_operators().size());
+}
+
+
+// mode = true: causing fact has become *true*
+// mode = false: causing fact has become *false*
+void SATSearch::axiom_dfs(int var, set<int> & posReachable, set<int> & negReachable, bool mode){
+	if (mode){
+		// causing fact has become true, this means the DP could turn true
+		if (posReachable.count(var)) return;
+		posReachable.insert(var);
+
+		// search for all axioms in which this var is contained positively. They could also turn true
+		for(int & succ : pos_derived_implication[var])
+			axiom_dfs(succ,posReachable, negReachable, true);
+		
+		// search for all axioms in which this var is contained negatively. They could turn false
+		for(int & succ : neg_derived_implication[var])
+			axiom_dfs(succ,posReachable, negReachable, false);
+
+	} else {
+		// causing fact has become false, this means the DP could turn false
+		if (negReachable.count(var)) return;
+		negReachable.insert(var);
+
+		// search for all axioms in which this var is contained positively. They could also turn false
+		for(int & succ : pos_derived_implication[var])
+			axiom_dfs(succ,posReachable, negReachable, false);
+		
+		// search for all axioms in which this var is contained negatively. They could turn true
+		for(int & succ : neg_derived_implication[var])
+			axiom_dfs(succ,posReachable, negReachable, true);
+	}
+}
+
+void SATSearch::set_up_axioms(){
 	derived_implication.clear();
 	derived_implication.resize(task_proxy.get_variables().size());
 	pos_derived_implication.clear();
@@ -629,53 +670,13 @@ void SATSearch::initialize() {
 			}
 		}
 	}
-
-
-	if (existsStep)
-		set_up_exists_step();
-	else
-		set_up_single_step();
-
-	assert(global_action_ordering.size() == number_of_non_leaf_operators);
 }
 
 void SATSearch::set_up_single_step() {
 	for (size_t op = 0; op < task_proxy.get_operators().size(); op++)
-		if (!is_leaf_operator[op])
-			global_action_ordering.push_back(op);
+		global_action_ordering.push_back(op);
 }
 
-
-// mode = true: causing fact has become *true*
-// mode = false: causing fact has become *false*
-void SATSearch::axiom_dfs(int var, set<int> & posReachable, set<int> & negReachable, bool mode){
-	if (mode){
-		// causing fact has become true, this means the DP could turn true
-		if (posReachable.count(var)) return;
-		posReachable.insert(var);
-
-		// search for all axioms in which this var is contained positively. They could also turn true
-		for(int & succ : pos_derived_implication[var])
-			axiom_dfs(succ,posReachable, negReachable, true);
-		
-		// search for all axioms in which this var is contained negatively. They could turn false
-		for(int & succ : neg_derived_implication[var])
-			axiom_dfs(succ,posReachable, negReachable, false);
-
-	} else {
-		// causing fact has become false, this means the DP could turn false
-		if (negReachable.count(var)) return;
-		negReachable.insert(var);
-
-		// search for all axioms in which this var is contained positively. They could also turn false
-		for(int & succ : pos_derived_implication[var])
-			axiom_dfs(succ,posReachable, negReachable, false);
-		
-		// search for all axioms in which this var is contained negatively. They could turn true
-		for(int & succ : neg_derived_implication[var])
-			axiom_dfs(succ,posReachable, negReachable, true);
-	}
-}
 
 void SATSearch::set_up_exists_step() {
 	
@@ -869,8 +870,6 @@ void SATSearch::set_up_exists_step() {
 	
 	// go backwards though the SCCs
 	for (int scc = disabling_sccs.size() - 1; scc >= 0; scc--){
-		// artificial leaf operator action
-		if (disabling_sccs[scc].size() == 1 && is_leaf_operator[disabling_sccs[scc][0]]) continue;
 
 		//log << "\t SCC No " << scc << endl;
 		for (size_t i = 0; i < disabling_sccs[scc].size(); i++){
@@ -1030,7 +1029,8 @@ void SATSearch::printVariableTruth(void* solver, sat_capsule & capsule){
 }
 
 
-
+// Run the SAT planner for *one* specific number of time steps
+// This length is stored in currentLength -- it cannot be an argument for this function as the step function cannot have any arguments.
 SearchStatus SATSearch::step() {
 	sat_capsule capsule;
 	reset_number_of_clauses();
@@ -1044,12 +1044,15 @@ SearchStatus SATSearch::step() {
 
 	log << "Building SAT formula for plan length " << currentLength << endl;
 
+
+	// set up infrastructure for counting sizes of different parts of the formula
 	clauseCounter.clear();
 	variableCounter.clear();
 	int curClauseNumber = 0;
 #define registerClauses(NAME) clauseCounter[NAME] += get_number_of_clauses() - curClauseNumber; curClauseNumber = get_number_of_clauses();
 
 
+	// axiom set up
 	map<int,int> numberOfAxiomLayerVariablesPerDerived;
 	for (AxiomSCC & scc : axiomSCCsInTopOrder){
 		if (scc.sizeOne) scc.numberOfAxiomLayers = 1;
@@ -1075,14 +1078,11 @@ SearchStatus SATSearch::step() {
 	axiom_variables.resize(currentLength+1);
 	operator_variables.clear();
 	operator_variables.resize(currentLength);
-	real_operator_variables.clear();
-	real_operator_variables.resize(currentLength);
 
 	for (int time = 0; time < currentLength; time++){
 		for (size_t op = 0; op < task_proxy.get_operators().size(); op ++){
 			int opvar = capsule.new_variable();
 			operator_variables[time].push_back(opvar);
-			if (!is_leaf_operator[op]) real_operator_variables[time].push_back(opvar);
 			variableCounter["operator"]++;
 			DEBUG(capsule.registerVariable(opvar,"op " + pad_int(op) + " @ " + pad_int(time) + " " + task_proxy.get_operators()[op].get_name()));
 		}
@@ -1277,16 +1277,7 @@ SearchStatus SATSearch::step() {
 				int thisTime = fact_variables[time][var][val];
 				int nextTime = fact_variables[time+1][var][val];
 
-				//vector<int> achieverVars;
-				//for (int a : achiever[var][val])
-				//	achieverVars.push_back(operator_variables[time][a]);
-
 				impliesPosAndNegImpliesOr(solver,nextTime,thisTime,achieverVars[time][var][val]);
-
-				//vector<int> deleterVars;
-				//for (int d : deleter[var][val])
-				//	deleterVars.push_back(operator_variables[time][d]);
-
 				impliesPosAndNegImpliesOr(solver,thisTime,nextTime,deleterVars[time][var][val]);
 			}
 		}
@@ -1652,15 +1643,13 @@ SearchStatus SATSearch::step() {
 	
 	// 7. Action Control
 	for (int time = 0; time < currentLength; time++){
-		if (real_operator_variables[time].size() == 0) continue;
-			
 		if (existsStep)
 			// exists-step gets all operator variables -- otherwise indexing is too difficult
 			exists_step_restriction(solver,capsule,operator_variables[time], time);
 		else
-			atMostOne(solver,capsule,real_operator_variables[time]);
+			atMostOne(solver,capsule,operator_variables[time]);
 
-		if (forceAtLeastOneAction) atLeastOne(solver,capsule,real_operator_variables[time]);
+		if (forceAtLeastOneAction) atLeastOne(solver,capsule,operator_variables[time]);
 	
 		registerClauses("action control");
 	}
@@ -1704,7 +1693,6 @@ SearchStatus SATSearch::step() {
 			map<int,int> operatorsThisTime;
 			for (size_t op = 0; op < task_proxy.get_operators().size(); op++){
 				// the leaf operators don't have to be inserted into the plan
-				if (is_leaf_operator[op]) continue;
 				int opvar = operator_variables[time][op];
 				int val = ipasir_val(solver,opvar);
 				if (val > 0){
