@@ -43,6 +43,12 @@ report_bitwidth()
 set_up_build_types("Debug;Release")
 set_up_options()
 
+if (SAT_DIR)
+	message("Compiling with SAT solver support")
+	message("Link dir: ${SAT_DIR}")
+	link_directories(${SAT_DIR})
+endif()
+
 project(downward LANGUAGES CXX)
 add_executable(downward planner.cc)
 
@@ -570,6 +576,63 @@ if(USE_LP)
         target_sources(lp_solver INTERFACE lp/soplex_solver_interface.h lp/soplex_solver_interface.cc)
     endif()
 endif()
+
+create_fast_downward_library(
+    NAME sat_solver
+    HELP ""
+    SOURCES
+        sat/sat_encoder
+    DEPENDENCY_ONLY
+)
+
+if (SAT_DIR)
+	if (USE_KISSAT)
+        message("Build against kissat")
+		target_link_libraries(sat_solver INTERFACE kissat)
+        target_sources(sat_solver INTERFACE sat/kissat.cc sat/kissat.h sat/no_branching_heuristic.cc)
+	endif()
+	if (USE_KISSATP)
+        message("Build against modified kissat")
+		target_link_libraries(sat_solver INTERFACE kissat)
+        target_sources(sat_solver INTERFACE sat/kissat.cc sat/kissat.h sat/branching_heuristic.cc)
+	endif()
+
+	if (USE_CMS)
+		message("Build against cryptominisat solver")
+		target_link_libraries(downward INTERFACE ipasircryptominisat5)
+		target_link_libraries(downward INTERFACE gmp)
+		target_link_libraries(downward INTERFACE cadiback)
+		target_link_libraries(downward INTERFACE cadical)
+        target_sources(sat_solver INTERFACE sat/no_branching_heuristic.cc)
+	endif()
+	if ((NOT USE_CMS) AND (NOT USE_KISSAT) AND (NOT USE_KISSATP))
+		message("Build against regular ipasir solver")
+		target_link_libraries(downward INTERFACE ipasir)
+        target_sources(sat_solver INTERFACE sat/no_branching_heuristic.cc)
+	endif()
+endif()
+
+create_fast_downward_library(
+    NAME sat_search
+	HELP "SAT search"
+    SOURCES
+        sat/sat_search
+        sat/sat_encoder
+    DEPENDS
+		sat_solver
+    DEPENDENCY_ONLY
+)
+
+create_fast_downward_library(
+    NAME plugin_sat
+	HELP "SAT search"
+    SOURCES
+        sat/plugin_sat
+    DEPENDS
+        sat_search
+        search_common
+)
+
 
 create_fast_downward_library(
     NAME relaxation_heuristic
