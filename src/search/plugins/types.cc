@@ -306,9 +306,11 @@ void TypeRegistry::insert_basic_type(const string &name) {
 const FeatureType &TypeRegistry::create_feature_type(const CategoryPlugin &plugin) {
     type_index type = plugin.get_pointer_type();
     if (registered_types.count(type)) {
-        ABORT("Creating the FeatureType '" + plugin.get_class_name()
-              + "' but the type '" + registered_types[type]->name()
-              + "' already exists and has the same type_index.");
+        const FeatureType &type_ref = *static_cast<const FeatureType *>(registered_types[type].get());
+        return type_ref;
+        // ABORT("Creating the FeatureType '" + plugin.get_class_name()
+        //       + "' but the type '" + registered_types[type]->name()
+        //       + "' already exists and has the same type_index.");
     }
     unique_ptr<FeatureType> type_ptr = make_unique<FeatureType>(
         plugin.get_pointer_type(), plugin.get_category_name(),
@@ -321,15 +323,18 @@ const FeatureType &TypeRegistry::create_feature_type(const CategoryPlugin &plugi
 const EnumType &TypeRegistry::create_enum_type(const EnumPlugin &plugin) {
     type_index type = plugin.get_type();
     const EnumInfo &values = plugin.get_enum_info();
-    if (registered_types.count(type)) {
-        ABORT("Creating the EnumType '" + plugin.get_class_name()
-              + "' but the type '" + registered_types[type]->name()
-              + "' already exists and has the same type_index.");
+    // if type is already registered, return its previous registration result.
+	if (registered_types.count(type)) {
+        const EnumType &type_ref = *static_cast<const EnumType *>(registered_types[type].get());
+        return type_ref;
+        // ABORT("Creating the EnumType '" + plugin.get_class_name()
+        //       + "' but the type '" + registered_types[type]->name()
+        //       + "' already exists and has the same type_index.");
     }
     unique_ptr<EnumType> type_ptr = make_unique<EnumType>(type, values);
     const EnumType &type_ref = *type_ptr;
     registered_types[type] = move(type_ptr);
-    return type_ref;
+	return type_ref;
 }
 
 const ListType &TypeRegistry::create_list_type(const Type &element_type) {

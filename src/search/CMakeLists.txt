@@ -762,6 +762,7 @@ create_fast_downward_library(
         tasks/domain_abstracted_task_factory
         tasks/modified_goals_task
         tasks/modified_operator_costs_task
+	tasks/sat_axiom_task
     DEPENDS
         task_properties
     DEPENDENCY_ONLY
