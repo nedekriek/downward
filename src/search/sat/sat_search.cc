@@ -21,7 +21,7 @@
 
 using namespace std;
 
-
+// Global variables for the SAT search
 sat_search::SATSearch* kissatSearch;
 int kissatCurrentLength;
 int kissatNVar;
@@ -29,6 +29,7 @@ bool kissatReachedFinalStage;
 
 
 namespace sat_search {
+
 SATSearch::SATSearch(
 	int _encoding,
 	int	_planLength,
@@ -57,9 +58,20 @@ SATSearch::SATSearch(
 	disableVARElimination(_disableVARElimination)
 	{
 
+	//Parse the encoding parameter
 	switch (_encoding){
-		case 0: existsStep = false; break;
-		case 2: existsStep = true; break;
+		case 0: encoding = SATEncoding::SEQUENTIAL;
+			log << "Using SEQUENTIAL encoding" << endl;
+			break;
+		case 2: encoding = SATEncoding::EXISTS_STEP;
+			log << "Using EXISTS_STEP encoding" << endl;
+			break;
+		case 3: encoding = SATEncoding::RELAXED_EXISTS_STEP;
+			log << "Using RELAXED_EXISTS_STEP encoding" << endl;	
+			break;
+		case 4: encoding = SATEncoding::RELAXED_RELAXED_EXISTS_STEP;
+			log << "Using RELAXED_RELAXED_EXISTS_STEP encoding" << endl;	
+			break;
 		default:
 			log << "Error: encoding No " << _encoding << " is not supported" << endl;
 			exit(-1);
@@ -107,7 +119,6 @@ bool SATSearch::have_actions_unconflicting_effects(int op1_no, int op2_no){
                                     			   sorted_op_effects[op2_no]);
 }
 
-
 void SATSearch::initialize() {
 	log << "conducting SAT search"
 		<< " for plan length: " << (planLength==-1?"all":to_string(planLength))
@@ -117,14 +128,29 @@ void SATSearch::initialize() {
 	set_up_axioms();
 
 	// prepare for parallelism encodings 
-	if (existsStep)
-		set_up_exists_step();
-	else
-		set_up_single_step();
+	switch (encoding) {
+		{
+		case SATEncoding::SEQUENTIAL:
+			set_up_single_step();
+			break;
+		case SATEncoding::EXISTS_STEP:
+			set_up_exists_step();
+			break;
+		case SATEncoding::RELAXED_EXISTS_STEP:
+			//TODO set_up_relaxed_exists_step();
+			break;
+		case SATEncoding::RELAXED_RELAXED_EXISTS_STEP:
+			//TODO set_up_relaxed_relaxed_exists_step();
+			break;
+		default:
+			log << "Error: setup for encoding  No" << encoding << " is not supported" << endl;
+			exit(-1);
+			break;
+		}
+	}
 
 	assert(global_action_ordering.size() == task_proxy.get_operators().size());
 }
-
 
 // mode = true: causing fact has become *true*
 // mode = false: causing fact has become *false*
@@ -677,7 +703,6 @@ void SATSearch::set_up_single_step() {
 		global_action_ordering.push_back(op);
 }
 
-
 void SATSearch::set_up_exists_step() {
 	
 	/////////// Exists step encoding
@@ -973,7 +998,6 @@ void SATSearch::exists_step_restriction(void* solver,sat_capsule & capsule,vecto
 	}
 }
 
-
 void SATSearch::print_statistics() const {
     statistics.print_detailed_statistics();
 }
@@ -997,7 +1021,6 @@ int SATSearch::get_last_axiom_var(int time, FactProxy fact){
 		return -axiom_variables[time][fact.get_variable().get_id()].back();
 }
 
-
 int SATSearch::get_last_axiom_var(int time, FactPair fact){
 	if (fact.value == 1)
 		return axiom_variables[time][fact.var].back();
@@ -1008,7 +1031,6 @@ int SATSearch::get_last_axiom_var(int time, FactPair fact){
 int SATSearch::get_fact_var(int time, FactPair fact){
 	return fact_variables[time][fact.var][fact.value];
 }
-
 
 void SATSearch::printVariableTruth(void* solver, sat_capsule & capsule){
 	for (int v = 1; v <= capsule.number_of_variables; v++){

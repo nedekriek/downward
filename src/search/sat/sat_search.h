@@ -53,7 +53,7 @@ public:
 	int lengthIteration;
 	int startLength;
 	double multiplier;
-	bool existsStep = true;
+	SATEncoding encoding;
 	int disablingThreshold;
 	bool aboveThresholdGroupJoining;
 	bool useRintanensP;
@@ -83,7 +83,9 @@ public:
 	std::vector<std::vector<int>> pos_derived_implication;
 	std::vector<std::vector<int>> neg_derived_implication;
 	std::map<FactPair, std::vector<int>> derived_entry_edges;
+
 	void axiom_dfs(int var, std::set<int> & posReachable, std::set<int> & negReachable, bool mode);
+	
 	// axiom SCCs
 	std::vector<AxiomSCC> axiomSCCsInTopOrder;
 	std::vector<std::vector<OperatorProxy>> achievers_per_derived;
@@ -169,5 +171,14 @@ extern void add_sat_search_options_to_feature(plugins::Feature &feature, const s
 extern std::tuple<OperatorCost, int, double, std::string, utils::Verbosity>
 get_sat_search_arguments_from_options(const plugins::Options &opts);
 }
+
+
+enum class SATEncoding {
+    SEQUENTIAL = 0,
+	// TODO: implement for all encoding as enum 1
+    EXISTS_STEP = 2,
+    RELAXED_EXISTS_STEP = 3,
+    RELAXED_RELAXED_EXISTS_STEP = 4
+};
 
 #endif
