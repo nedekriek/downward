@@ -44,9 +44,6 @@ public:
     // Make task_proxy public for access in sat solver heuristic
     using SearchAlgorithm::task_proxy;
 	
-	// debugging / output configuration
-	bool logInference = false;
-	
 	// actual run configuration
 	int planLength;
 	int currentLength;
@@ -133,6 +130,8 @@ public:
 	
 	void set_up_axioms();
 	void set_up_exists_step();
+	void set_up_relaxed_exists_step();
+	//TODO: void set_up_relaxed_relaxed_exists_step();
 	void set_up_single_step();
 
 	// Kissat interface
