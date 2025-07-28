@@ -39,6 +39,14 @@ struct AxiomSCC{
 	
 };
 
+enum class SATEncoding {
+    SEQUENTIAL = 0,
+	// TODO: implement for all encoding as enum 1
+    EXISTS_STEP = 2,
+    RELAXED_EXISTS_STEP = 3,
+    RELAXED_RELAXED_EXISTS_STEP = 4
+};
+
 class SATSearch : public SearchAlgorithm {
 public:
     // Make task_proxy public for access in sat solver heuristic
@@ -85,7 +93,7 @@ public:
 	
 	// axiom SCCs
 	std::vector<AxiomSCC> axiomSCCsInTopOrder;
-	std::vector<std::vector<OperatorProxy>> achievers_per_derived;
+	std::vector<std::vector<OperatorProxy>> map_dp_to_achieving_axioms;
 	
 	void printVariableTruth(void* solver, sat_capsule & capsule);
 
@@ -117,8 +125,8 @@ public:
 	std::vector<int> global_action_ordering;
 	// generate Erasing and Requiring list
 	// per fact, per SCC, gives a list of all E/R as a pair: <operator,position_in_scc>
-	std::map<FactPair,std::vector< std::vector<std::pair<int,int>> >> erasingList;
-	std::map<FactPair,std::vector< std::vector<std::pair<int,int>> >> requiringList;
+	std::map<FactPair,std::vector< std::vector<std::pair<int,int>>  >> erasingList;
+	std::map<FactPair,std::vector< std::vector<std::pair<int,int>>  >> requiringList;
 
 	void exists_step_restriction(void* solver,sat_capsule & capsule, std::vector<int> & operator_variables, int time);
 	void generateChain(void* solver,sat_capsule & capsule, std::vector<int> & operator_variables,
@@ -166,18 +174,6 @@ public:
     virtual void print_statistics() const override;
 };
 
-extern void add_sat_search_options_to_feature(plugins::Feature &feature, const std::string &description);
-extern std::tuple<OperatorCost, int, double, std::string, utils::Verbosity>
-get_sat_search_arguments_from_options(const plugins::Options &opts);
 }
-
-
-enum class SATEncoding {
-    SEQUENTIAL = 0,
-	// TODO: implement for all encoding as enum 1
-    EXISTS_STEP = 2,
-    RELAXED_EXISTS_STEP = 3,
-    RELAXED_RELAXED_EXISTS_STEP = 4
-};
 
 #endif

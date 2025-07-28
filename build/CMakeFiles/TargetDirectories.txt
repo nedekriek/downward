@@ -1,0 +1,6 @@
+/home/natasha/code/downward/build/CMakeFiles/translate.dir
+/home/natasha/code/downward/build/CMakeFiles/edit_cache.dir
+/home/natasha/code/downward/build/CMakeFiles/rebuild_cache.dir
+/home/natasha/code/downward/build/search/CMakeFiles/downward.dir
+/home/natasha/code/downward/build/search/CMakeFiles/edit_cache.dir
+/home/natasha/code/downward/build/search/CMakeFiles/rebuild_cache.dir

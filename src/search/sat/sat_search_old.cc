@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "sat_search.h"
+#include "sat_search_old.h"
 #include "kissat-p.h"
 
 #include "../plugins/options.h"
@@ -137,7 +137,7 @@ void SATSearch::initialize() {
 			set_up_exists_step();
 			break;
 		case SATEncoding::RELAXED_EXISTS_STEP:
-			//TODO set_up_relaxed_exists_step();
+			set_up_relaxed_exists_step();
 			break;
 		case SATEncoding::RELAXED_RELAXED_EXISTS_STEP:
 			//TODO set_up_relaxed_relaxed_exists_step();
@@ -183,14 +183,21 @@ void SATSearch::axiom_dfs(int var, set<int> & posReachable, set<int> & negReacha
 	}
 }
 
+
+// NOTE: no modification needed
 void SATSearch::set_up_axioms(){
 	derived_implication.clear();
 	derived_implication.resize(task_proxy.get_variables().size());
+	
 	pos_derived_implication.clear();
 	pos_derived_implication.resize(task_proxy.get_variables().size());
+	
 	neg_derived_implication.clear();
 	neg_derived_implication.resize(task_proxy.get_variables().size());
-	achievers_per_derived.resize(task_proxy.get_variables().size());
+	
+	//TODO: ask why this is not cleared
+	map_dp_to_achieving_axioms.resize(task_proxy.get_variables().size());
+	
 	derived_entry_edges.clear();
 
 	// find statically true DPs
@@ -259,7 +266,7 @@ void SATSearch::set_up_axioms(){
 		
 		int eff_var = thisEff.get_fact().get_variable().get_id();
 		assert(thisEff.get_fact().get_value() == 1);
-		achievers_per_derived[eff_var].push_back(opProxy);
+		map_dp_to_achieving_axioms[eff_var].push_back(opProxy);
 
 		// statically true DP, it does not depend on anything even if there are axioms.
 		if (statically_true_derived_predicates.count(eff_var)) continue;
@@ -296,7 +303,6 @@ void SATSearch::set_up_axioms(){
 			}
 		}
 	}
-
 
 	vector<vector<int>> initial_derived_sccs = sccs::compute_maximal_sccs(derived_implication);
 	vector<vector<int>> derived_sccs;
@@ -346,7 +352,7 @@ void SATSearch::set_up_axioms(){
 		int varDependencyInternal = -1;
 		set<int> dependentVariables;
 		for (int dp : s){
-			for (OperatorProxy opProxy : achievers_per_derived[dp]){
+			for (OperatorProxy opProxy : map_dp_to_achieving_axioms[dp]){
 				// effect
 				EffectsProxy effs = opProxy.get_effects();
 				EffectProxy thisEff = effs[0];
@@ -613,7 +619,7 @@ void SATSearch::set_up_axioms(){
 				
 				for (size_t varOffsetTo = 0; varOffsetTo < scc.variables.size(); varOffsetTo++){
 					int variableTo = scc.variables[varOffsetTo];
-					for (OperatorProxy opProxy : achievers_per_derived[variableTo]){
+					for (OperatorProxy opProxy : map_dp_to_achieving_axioms[variableTo]){
 						// effect
 						EffectsProxy effs = opProxy.get_effects();
 						assert(effs.size() == 1);
@@ -727,6 +733,7 @@ void SATSearch::set_up_exists_step() {
 		EffectsProxy effs = opProxy.get_effects();
 		for (size_t eff = 0; eff < effs.size(); eff++){
 			EffectProxy thisEff = effs[eff];
+
 			// gather the conditions of the conditional effect 
 			EffectConditionsProxy cond = thisEff.get_conditions();
 			vector<FactPair> conditions;
@@ -745,7 +752,7 @@ void SATSearch::set_up_exists_step() {
 				set<int> posReachable, negReachable;
 				axiom_dfs(start,posReachable, negReachable, true); // fact has become true
 				// if derived is maintained, it cannot be deleted.
-				//if (maintainedFactsByOperator[op].count(FactPair(reach,1)) &&
+				// if (maintainedFactsByOperator[op].count(FactPair(reach,1)) &&
 				//	maintainedFactsByOperator[op].count(FactPair(reach,0))
 				//		) continue;
 				// if we make the entry point true, any of the connected axioms might become true, so we might delete any negative precondition on it
@@ -758,6 +765,8 @@ void SATSearch::set_up_exists_step() {
 					addingActions[FactPair(reach,0)].push_back({op,fullConditions});
 				}
 			}
+
+
 
 			// implicit deleting effects, i.e. delete any value of the variable that is set
 			for (int val = 0; val < thisEff.get_fact().get_variable().get_domain_size(); val++){
@@ -810,7 +819,7 @@ void SATSearch::set_up_exists_step() {
                     [](const EffectProxy &eff) {return eff.get_fact().get_pair();}));
         });
 
---------------------------------------------------------------------------
+
 	// actually compute the edges of the graph
 	vector<set<int>> disabling_graph(task_proxy.get_operators().size());
 	int number_of_edges_in_disabling_graph = 0;
@@ -926,7 +935,7 @@ void SATSearch::set_up_exists_step() {
 
 int chain_number = 0;
 
-void SATSearch::generateChain(void* solver,sat_capsule & capsule,vector<int> & operator_variables,
+void SATSearch::generateChain(void* solver, sat_capsule & capsule, vector<int> & operator_variables,
 	const std::vector<std::pair<int, int>>& E,
 	const std::vector<std::pair<int, int>>& R,
 	int time){
@@ -980,7 +989,7 @@ void SATSearch::generateChain(void* solver,sat_capsule & capsule,vector<int> & o
 	}
 }
 
-void SATSearch::exists_step_restriction(void* solver,sat_capsule & capsule,vector<int> & operator_variables, int time){
+void SATSearch::exists_step_restriction(void* solver, sat_capsule & capsule, vector<int> & operator_variables, int time){
 	// loop over all fact pairs
 	for (auto & [factPair, requiringLists] : requiringList){
 		for (size_t scc = 0; scc < requiringLists.size(); scc++){
@@ -994,6 +1003,9 @@ void SATSearch::exists_step_restriction(void* solver,sat_capsule & capsule,vecto
 			generateChain(solver,capsule,operator_variables,E,R, time);
 		}
 	}
+}
+
+void SATSearch::set_up_relaxed_exists_step() {
 }
 
 void SATSearch::print_statistics() const {
@@ -1069,6 +1081,7 @@ SearchStatus SATSearch::step() {
 	clauseCounter.clear();
 	variableCounter.clear();
 	int curClauseNumber = 0;
+
 #define registerClauses(NAME) clauseCounter[NAME] += get_number_of_clauses() - curClauseNumber; curClauseNumber = get_number_of_clauses();
 
 
@@ -1368,7 +1381,7 @@ SearchStatus SATSearch::step() {
 						causeVariables[sccvar].push_back(scc_var_fact_cur);
 						registerClauses("axioms evaluation");
 
-						for (OperatorProxy opProxy : achievers_per_derived[sccvar]){
+						for (OperatorProxy opProxy : map_dp_to_achieving_axioms[sccvar]){
 							// Effect
 							EffectsProxy effs = opProxy.get_effects();
 							assert(effs.size() == 1);
@@ -1463,7 +1476,7 @@ SearchStatus SATSearch::step() {
 					//	assertYes(solver,axiom_variables[time][sccvar][0]);
 					//	continue;
 					//}
-					for (OperatorProxy opProxy : achievers_per_derived[sccvar]){
+					for (OperatorProxy opProxy : map_dp_to_achieving_axioms[sccvar]){
 
 						// Effect
 						EffectsProxy effs = opProxy.get_effects();
