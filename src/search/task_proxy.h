@@ -23,7 +23,6 @@ class ConditionsProxy;
 class EffectProxy;
 class EffectConditionsProxy;
 class EffectsProxy;
-class FactProxy;
 class FactsProxy;
 class GoalsProxy;
 class OperatorProxy;
